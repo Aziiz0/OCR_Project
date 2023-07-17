@@ -30,7 +30,7 @@ Before getting started with this project, please ensure that you have the follow
      
      where `/full/path/to/` is the path to the downloaded fonts.
 
-4. **Tesseract OCR Data**:  
+5. **Tesseract OCR Data**:  
    - Clone or download the [tessdata](https://github.com/tesseract-ocr/tessdata) repository.
    - Place the downloaded tessdata folder inside the same directory as your project.
 
@@ -38,7 +38,10 @@ Before getting started with this project, please ensure that you have the follow
 
 To use this project/program, follow the steps below:
 
-1. Open your terminal or command prompt.
+1. Open your terminal or command prompt and run the following in the directory:
+   ```shell
+   dotnet new
+   ```
 
 2. Run the following commands:
 
