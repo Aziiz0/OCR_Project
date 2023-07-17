@@ -17,6 +17,19 @@ Before getting started with this project, please ensure that you have the follow
    - Download the appropriate version for your operating system.
    - Add the `bin64` directory to your system's PATH environment variable. This will allow you to access the Xpdf command-line tools from anywhere in your terminal.
 
+4. **Adding Extra Fonts for Xpdf**
+   - Visit [http://www.glyphandcog.com/support/q0016.html](http://www.glyphandcog.com/support/q0016.html)
+   - Download the 2 fonts
+   - Intructions will guide you but simply create an xpdfrc file with no extentions in your `bin64` directory.
+   - Inside the xpdfrc file put:
+
+     ```text
+     fontFile Symbol       "/full/path/to/s050000l.pfb"
+     fontFile ZapfDingbats "/full/path/to/d050000l.pfb"
+     ```
+     
+     where `/full/path/to/` is the path to the downloaded fonts.
+
 4. **Tesseract OCR Data**:  
    - Clone or download the [tessdata](https://github.com/tesseract-ocr/tessdata) repository.
    - Place the downloaded tessdata folder inside the same directory as your project.
