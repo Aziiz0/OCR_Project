@@ -1,5 +1,0 @@
-C:\Users\adeeb\OneDrive\Documents\GitHub\OCR_Project\obj\Debug\net6.0\OCR_Project.csproj.AssemblyReference.cache
-C:\Users\adeeb\OneDrive\Documents\GitHub\OCR_Project\obj\Debug\net6.0\OCR_Project.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\adeeb\OneDrive\Documents\GitHub\OCR_Project\obj\Debug\net6.0\OCR_Project.AssemblyInfoInputs.cache
-C:\Users\adeeb\OneDrive\Documents\GitHub\OCR_Project\obj\Debug\net6.0\OCR_Project.AssemblyInfo.cs
-C:\Users\adeeb\OneDrive\Documents\GitHub\OCR_Project\obj\Debug\net6.0\OCR_Project.csproj.CoreCompileInputs.cache
