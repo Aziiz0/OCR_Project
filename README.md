@@ -13,12 +13,12 @@ Before getting started with this project, please ensure that you have the follow
    [Download .NET](https://dotnet.microsoft.com/download) and install it on your system.
 
 3. **Xpdf Command-Line Tools**:  
-   - Visit [https://www.xpdfreader.com/download.html](https://www.xpdfreader.com/download.html)
+   - Visit [Xpdf Reader](https://www.xpdfreader.com/download.html)
    - Download the appropriate version for your operating system.
    - Add the `bin64` directory to your system's PATH environment variable. This will allow you to access the Xpdf command-line tools from anywhere in your terminal.
 
 4. **Adding Extra Fonts for Xpdf**
-   - Visit [http://www.glyphandcog.com/support/q0016.html](http://www.glyphandcog.com/support/q0016.html)
+   - Visit [Xpdf Fonts](http://www.glyphandcog.com/support/q0016.html)
    - Download the 2 fonts
    - Intructions will guide you but simply create an xpdfrc file with no extentions in your `bin64` directory.
    - Inside the xpdfrc file put:
