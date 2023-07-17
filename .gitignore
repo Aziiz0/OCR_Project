@@ -5,9 +5,8 @@ tessdata/
 OutputTexts/
 PDFs/
 OutputImages/
-bin/
 obj/
-OCR_Project.csproj
+bin/
 
 # Prerequisites
 *.d

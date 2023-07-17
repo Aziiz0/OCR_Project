@@ -43,8 +43,7 @@ To use this project/program, follow the steps below:
 2. Run the following commands:
 
    ```shell
-   dotnet add package Tesseract
-   dotnet add package Pdf2Png
+   dotnet restore
    ```
 
 ## Running the Project

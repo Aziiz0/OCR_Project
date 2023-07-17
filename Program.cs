@@ -1,9 +1,7 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.IO;
-using System.Threading.Tasks;
+using System.Text;
+using BitMiracle.Docotic.Pdf;
 using Tesseract;
 
 class Program
@@ -11,12 +9,10 @@ class Program
     static void Main(string[] args)
     {
         var pdfDirectoryPath = Path.Combine(Directory.GetCurrentDirectory(), "PDFs");
-        var outputImageDirectory = Path.Combine(Directory.GetCurrentDirectory(), "OutputImages");
         var outputTextDirectory = Path.Combine(Directory.GetCurrentDirectory(), "OutputTexts");
 
         // Check if the directories exist, if not, create them
         if (!Directory.Exists(pdfDirectoryPath)) Directory.CreateDirectory(pdfDirectoryPath);
-        if (!Directory.Exists(outputImageDirectory)) Directory.CreateDirectory(outputImageDirectory);
         if (!Directory.Exists(outputTextDirectory)) Directory.CreateDirectory(outputTextDirectory);
 
         var pdfFiles = Directory.GetFiles(pdfDirectoryPath, "*.pdf");
@@ -25,70 +21,59 @@ class Program
         {
             Console.WriteLine($"Processing file {pdfFile}");
 
-            var outputImagePath = Path.Combine(outputImageDirectory, Path.GetFileNameWithoutExtension(pdfFile));
-            var command = $"pdftoppm -png \"{pdfFile}\" \"{outputImagePath}\"";
-            Console.WriteLine($"Executing command: {command}");
-
-            var process = new Process
+            var documentText = new StringBuilder();
+            using (var pdf = new PdfDocument(pdfFile))
             {
-                StartInfo = new ProcessStartInfo
+                using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default))
                 {
-                    FileName = "pdftoppm", 
-                    Arguments = $"-png \"{pdfFile}\" \"{outputImagePath}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true, // Redirect the standard error stream
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                }
-            };
-
-            process.Start();
-
-            // Read the error output
-            string errorOutput = process.StandardError.ReadToEnd();
-
-            process.WaitForExit();
-
-            if (!string.IsNullOrWhiteSpace(errorOutput))
-            {
-                // If there's any error output, display it
-                Console.WriteLine($"Error during conversion of {pdfFile}: {errorOutput}");
-            }
-            else
-            {
-                Console.WriteLine($"Conversion of {pdfFile} completed successfully");
-            }
-
-            // OCR each page
-            var outputImages = Directory.GetFiles(outputImageDirectory, "*.png");
-
-            foreach (var outputImage in outputImages)
-            {
-                try
-                {
-                    using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default))
+                    for (int i = 0; i < pdf.PageCount; ++i)
                     {
-                        using (var img = Pix.LoadFromFile(outputImage))
-                        {
-                            using (var page = engine.Process(img))
-                            {
-                                var text = page.GetText();
+                        if (documentText.Length > 0)
+                            documentText.Append("\r\n\r\n");
 
-                                // Write the OCR result to a text file in the OCR directory
-                                var textFileName = Path.Combine(outputTextDirectory, Path.GetFileNameWithoutExtension(outputImage) + ".txt");
-                                File.WriteAllText(textFileName, text);
+                        PdfPage page = pdf.Pages[i];
+                        string searchableText = page.GetText();
+
+                        // Simple check if the page contains searchable text.
+                        // We do not need to perform OCR in that case.
+                        if (!string.IsNullOrEmpty(searchableText.Trim()))
+                        {
+                            documentText.Append(searchableText);
+                            continue;
+                        }
+
+                        // This page is not searchable.
+                        // Save the page as a high-resolution image
+                        PdfDrawOptions options = PdfDrawOptions.Create();
+                        options.BackgroundColor = new PdfRgbColor(255, 255, 255);
+                        options.HorizontalResolution = 300;
+                        options.VerticalResolution = 300;
+
+                        string pageImage = $"page_{i}.png";
+                        page.Save(pageImage, options);
+
+                        // Perform OCR
+                        using (Pix img = Pix.LoadFromFile(pageImage))
+                        {
+                            using (Page recognizedPage = engine.Process(img))
+                            {
+                                Console.WriteLine($"Mean confidence for page #{i}: {recognizedPage.GetMeanConfidence()}");
+
+                                string recognizedText = recognizedPage.GetText();
+                                documentText.Append(recognizedText);
                             }
                         }
+                        
+                        File.Delete(pageImage);
                     }
                 }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                    Console.WriteLine("Unexpected Error: " + e.Message);
-                    Console.WriteLine("Details: ");
-                    Console.WriteLine(e.ToString());
-                }
             }
+
+            // Write the OCR result to a text file in the OCR directory
+            var textFileName = Path.Combine(outputTextDirectory, Path.GetFileNameWithoutExtension(pdfFile) + ".txt");
+            File.WriteAllText(textFileName, documentText.ToString());
+
+            Console.WriteLine($"Text extraction from {pdfFile} completed successfully");
         }
     }
 }
