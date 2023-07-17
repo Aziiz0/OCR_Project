@@ -1,3 +1,14 @@
+# Extras
+.vs/
+.vscode/
+bin/
+tessdata/
+obj/
+*.csproj
+OCR/
+PDFs/
+OutputImages/
+
 # Prerequisites
 *.d
 
