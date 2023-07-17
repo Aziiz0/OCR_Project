@@ -1,4 +1,6 @@
-﻿using System;
+﻿// See https://aka.ms/new-console-template for more information
+Console.WriteLine("Hello, World!");
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -10,7 +12,7 @@ class Program
     {
         var pdfDirectoryPath = Path.Combine(Directory.GetCurrentDirectory(), "PDFs");
         var outputImageDirectory = Path.Combine(Directory.GetCurrentDirectory(), "OutputImages");
-        var outputTextDirectory = Path.Combine(Directory.GetCurrentDirectory(), "OCR");
+        var outputTextDirectory = Path.Combine(Directory.GetCurrentDirectory(), "OutputTexts");
 
         // Check if the directories exist, if not, create them
         if (!Directory.Exists(pdfDirectoryPath)) Directory.CreateDirectory(pdfDirectoryPath);

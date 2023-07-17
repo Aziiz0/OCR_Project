@@ -1,11 +1,8 @@
 # Extras
 .vs/
 .vscode/
-bin/
 tessdata/
-obj/
-*.csproj
-OCR/
+OutputTexts/
 PDFs/
 OutputImages/
 
