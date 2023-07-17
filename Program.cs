@@ -21,16 +21,12 @@ class Program
         {
             Console.WriteLine($"Processing file {pdfFile}");
 
-            var documentText = new StringBuilder();
             using (var pdf = new PdfDocument(pdfFile))
             {
                 using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default))
                 {
                     for (int i = 0; i < pdf.PageCount; ++i)
                     {
-                        if (documentText.Length > 0)
-                            documentText.Append("\r\n\r\n");
-
                         PdfPage page = pdf.Pages[i];
                         string searchableText = page.GetText();
 
@@ -38,7 +34,6 @@ class Program
                         // We do not need to perform OCR in that case.
                         if (!string.IsNullOrEmpty(searchableText.Trim()))
                         {
-                            documentText.Append(searchableText);
                             continue;
                         }
 
@@ -52,28 +47,41 @@ class Program
                         string pageImage = $"page_{i}.png";
                         page.Save(pageImage, options);
 
-                        // Perform OCR
-                        using (Pix img = Pix.LoadFromFile(pageImage))
-                        {
-                            using (Page recognizedPage = engine.Process(img))
-                            {
-                                Console.WriteLine($"Mean confidence for page #{i}: {recognizedPage.GetMeanConfidence()}");
+                        // Perform OCR with different modes
+                        TestPageSegModes(engine, pageImage, i);
 
-                                string recognizedText = recognizedPage.GetText();
-                                documentText.Append(recognizedText);
-                            }
-                        }
-                        
                         File.Delete(pageImage);
                     }
                 }
             }
+        }
+    }
+    static void TestPageSegModes(TesseractEngine engine, string pageImage, int pageNumber)
+    {
+        using (Pix img = Pix.LoadFromFile(pageImage))
+        {
+            // Define the output file path. You can adjust this as needed.
+            string outputFilePath = $"test_output_page_{pageNumber}.txt";
 
-            // Write the OCR result to a text file in the OCR directory
-            var textFileName = Path.Combine(outputTextDirectory, Path.GetFileNameWithoutExtension(pdfFile) + ".txt");
-            File.WriteAllText(textFileName, documentText.ToString());
+            // Create a new StreamWriter. This will automatically create the file if it doesn't exist.
+            using (StreamWriter writer = new StreamWriter(outputFilePath))
+            {
+                foreach (PageSegMode mode in Enum.GetValues(typeof(PageSegMode)))
+                {
+                    if (mode == PageSegMode.OsdOnly)
+                    {
+                        continue;  // Skip OsdOnly mode
+                    }
 
-            Console.WriteLine($"Text extraction from {pdfFile} completed successfully");
+                    using (Page recognizedPage = engine.Process(img, mode))
+                    {
+                        writer.WriteLine($"Testing mode {mode} on page {pageNumber}");
+                        writer.WriteLine($"Mean confidence: {recognizedPage.GetMeanConfidence()}");
+                        writer.WriteLine($"Text: {recognizedPage.GetText()}");
+                        writer.WriteLine();
+                    }
+                }
+            }
         }
     }
 }
