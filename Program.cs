@@ -96,6 +96,18 @@ class Program
         }
     }
 
+    public static Dictionary<string, string> CreatePatientRecord(string patientName, string totalCharge)
+    {
+        var record = new Dictionary<string, string>
+        {
+            { "PatientName", patientName },
+            { "TotalCharge", totalCharge }
+        };
+
+        return record;
+    }
+
+
 
     static void TestPageSegModes(TesseractEngine engine, string pageImage, int pageNumber)
     {
