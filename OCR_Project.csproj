@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="BitMiracle.Docotic.Pdf" Version="9.0.15693-dev" />
+    <PackageReference Include="ChatGPT.Net" Version="2.0.0" />
     <PackageReference Include="Emgu.CV" Version="4.7.0.5276" />
     <PackageReference Include="Emgu.CV.runtime.windows" Version="4.7.0.5276" />
     <PackageReference Include="Tesseract" Version="5.2.0" />

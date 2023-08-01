@@ -1,5 +1,6 @@
-using BitMiracle.Docotic.Pdf;
+﻿using BitMiracle.Docotic.Pdf;
 using Tesseract;
+using System.Text;
 
 class Program
 {
@@ -32,6 +33,8 @@ class Program
             // Initialize Tesseract OCR engine
             using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default))
             {
+                StringBuilder allText = new StringBuilder();
+
                 // Loop through each page in the PDF
                 for (int i = 0; i < pdf.PageCount; ++i)
                 {
@@ -57,29 +60,33 @@ class Program
                     // Extract the contours from the image
                     var contourImages = ImageProcessor.ExtractContours(pageImage, i);
 
-                    // Create a new StreamWriter.
-                    string outputFilePath = $"output_page_{i}.txt";
-                    using (StreamWriter writer = new StreamWriter(outputFilePath))
+                    // Perform OCR on each contour image and delete it afterwards
+                    foreach(var contourImage in contourImages)
                     {
-                        // Perform OCR on each contour image and delete it afterwards
-                        foreach(var contourImage in contourImages)
-                        {
-                            // Perform OCR on the contour image and write the result to the output file
-                            PageOCR(engine, contourImage, writer);
+                        // Perform OCR on the contour image and append the result to the allText StringBuilder
+                        allText.AppendLine(PageOCR(engine, contourImage));
 
-                            // Delete the contour image
-                            //File.Delete(contourImage);
-                        }
+                        // Delete the contour image
+                        File.Delete(contourImage);
                     }
 
                     // Delete the original image of the page
                     File.Delete(pageImage);
                 }
+
+                // Now that we have all the text from the PDF, we can analyze it with AI
+                string aiAnalysisResult = AnalyzeTextWithAI(allText.ToString()).Result;
+
+                // Write the AI analysis result to a text file
+                using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
+                {
+                    writer.Write(aiAnalysisResult);
+                }
             }
         }
     }
 
-    static void PageOCR(TesseractEngine engine, string contourImage, StreamWriter writer)
+    static string PageOCR(TesseractEngine engine, string contourImage)
     {
         // Load the image
         using (Pix img = Pix.LoadFromFile(contourImage))
@@ -87,8 +94,8 @@ class Program
             // Perform OCR on the image
             using (Page recognizedPage = engine.Process(img))
             {
-                // Write the recognized text to the output file
-                writer.Write(recognizedPage.GetText());
+                // Return the recognized text
+                return recognizedPage.GetText();
             }
         }
     }
@@ -104,7 +111,29 @@ class Program
         return record;
     }
 
+    public static async Task<string> AnalyzeFileWithAI(string filePath)
+    {
+        string text = File.ReadAllText(filePath);
+        return await AnalyzeTextWithAI(text);
+    }
 
+    public static async Task<string> AnalyzeTextWithAI(string text)
+    {
+        // Initialize the OpenAI API with your API key
+        string apiKey = Environment.GetEnvironmentVariable("OpenAi_API_Key") ?? throw new Exception("OpenAI API key not found");
+
+        // Create an instance of the OpenAIProxy class
+        var proxy = new OpenAIProxy(apiKey);
+
+        // Define the prompt
+        string prompt = $"Extract the patient's name and total charge from the following text: {text}";
+
+        // Make the API call
+        var result = await proxy.Ask(prompt);
+
+        // Return the result
+        return result;
+    }
 
     static void TestPageSegModes(TesseractEngine engine, string pageImage, int pageNumber)
     {
