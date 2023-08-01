@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
-using BitMiracle.Docotic.Pdf;
+﻿using BitMiracle.Docotic.Pdf;
 using Tesseract;
 
 class Program
