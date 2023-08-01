@@ -12,6 +12,7 @@
     <PackageReference Include="ChatGPT.Net" Version="2.0.0" />
     <PackageReference Include="Emgu.CV" Version="4.7.0.5276" />
     <PackageReference Include="Emgu.CV.runtime.windows" Version="4.7.0.5276" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 

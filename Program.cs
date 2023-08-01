@@ -1,6 +1,6 @@
 ﻿using BitMiracle.Docotic.Pdf;
 using Tesseract;
-using System.Text;
+using Newtonsoft.Json;
 
 class Program
 {
@@ -8,11 +8,9 @@ class Program
     {
         // Define the path for the PDF files to be processed
         var pdfDirectoryPath = Path.Combine(Directory.GetCurrentDirectory(), "PDFs");
-        var outputTextDirectory = Path.Combine(Directory.GetCurrentDirectory(), "OutputTexts");
 
         // Check if the directories exist, if not, create them
         if (!Directory.Exists(pdfDirectoryPath)) Directory.CreateDirectory(pdfDirectoryPath);
-        if (!Directory.Exists(outputTextDirectory)) Directory.CreateDirectory(outputTextDirectory);
 
         // Get all the PDF files in the directory
         var pdfFiles = Directory.GetFiles(pdfDirectoryPath, "*.pdf");
@@ -22,18 +20,41 @@ class Program
         {
             Console.WriteLine($"Processing file {pdfFile}");
             ProcessPdfFiles(pdfFile);
+            
+            string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
+
+            // Now that we have all the text from the PDF, we can analyze it with AI
+            string aiAnalysisResult = AnalyzeFileWithAI(ocrResultsFile).Result;
+
+            // Write the AI analysis result to a text file
+            using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
+            {
+                writer.Write(aiAnalysisResult);
+            }
         }
     }
 
     static void ProcessPdfFiles(string pdfFile)
     {
+        string logFilePath = "log.txt";
+
+        // Load the log file
+        List<string> log = File.Exists(logFilePath) ? File.ReadAllLines(logFilePath).ToList() : new List<string>();
+
+        // If this PDF has already been processed, skip it
+        if (log.Contains(pdfFile))
+        {
+            Console.WriteLine($"Skipping file {pdfFile} because it has already been processed.");
+            return;
+        }
+
         // Load the PDF document
         using (var pdf = new PdfDocument(pdfFile))
         {
             // Initialize Tesseract OCR engine
             using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default))
             {
-                StringBuilder allText = new StringBuilder();
+                string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 
                 // Loop through each page in the PDF
                 for (int i = 0; i < pdf.PageCount; ++i)
@@ -63,8 +84,14 @@ class Program
                     // Perform OCR on each contour image and delete it afterwards
                     foreach(var contourImage in contourImages)
                     {
-                        // Perform OCR on the contour image and append the result to the allText StringBuilder
-                        allText.AppendLine(PageOCR(engine, contourImage));
+                        // Perform OCR on the contour image
+                        string ocrText = PageOCR(engine, contourImage);
+
+                        // Append the OCR result to the text file
+                        using (StreamWriter writer = new StreamWriter(ocrResultsFile, append: true))
+                        {
+                            writer.WriteLine(ocrText);
+                        }
 
                         // Delete the contour image
                         File.Delete(contourImage);
@@ -73,16 +100,9 @@ class Program
                     // Delete the original image of the page
                     File.Delete(pageImage);
                 }
-
-                // Now that we have all the text from the PDF, we can analyze it with AI
-                string aiAnalysisResult = AnalyzeTextWithAI(allText.ToString()).Result;
-
-                // Write the AI analysis result to a text file
-                using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
-                {
-                    writer.Write(aiAnalysisResult);
-                }
             }
+            log.Add(pdfFile);
+            File.WriteAllLines(logFilePath, log);
         }
     }
 
@@ -100,15 +120,18 @@ class Program
         }
     }
 
-    public static Dictionary<string, string> CreatePatientRecord(string patientName, string totalCharge)
+    public static Dictionary<string, string> CreatePatientRecord(string jsonString)
     {
-        var record = new Dictionary<string, string>
+        try
         {
-            { "PatientName", patientName },
-            { "TotalCharge", totalCharge }
-        };
-
-        return record;
+            var record = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonString);
+            return record;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Could not convert string to dictionary: {ex.Message}");
+            return null;
+        }
     }
 
     public static async Task<string> AnalyzeFileWithAI(string filePath)
@@ -126,7 +149,7 @@ class Program
         var proxy = new OpenAIProxy(apiKey);
 
         // Define the prompt
-        string prompt = $"Extract the patient's name and total charge from the following text: {text}";
+        string prompt = $"Given the following text, extract the patient's name and total charge and return the result in JSON format: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": \"John Doe\", \"TotalCharge\": \"$200.00\"}}";
 
         // Make the API call
         var result = await proxy.Ask(prompt);
