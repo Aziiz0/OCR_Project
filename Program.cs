@@ -4,33 +4,59 @@ using Newtonsoft.Json;
 
 class Program
 {
-    static void Main(string[] args)
+    public class User
     {
-        // Define the path for the PDF files to be processed
-        var pdfDirectoryPath = Path.Combine(Directory.GetCurrentDirectory(), "PDFs");
+        public string PatientName { get; set; }
+        public decimal TotalCharge { get; set; }
+        public int TotalMiles { get; set; } // change to match the AI output
+        // Add other properties as needed
+    }
 
-        // Check if the directories exist, if not, create them
-        if (!Directory.Exists(pdfDirectoryPath)) Directory.CreateDirectory(pdfDirectoryPath);
-
-        // Get all the PDF files in the directory
-        var pdfFiles = Directory.GetFiles(pdfDirectoryPath, "*.pdf");
-
-        // Loop through each PDF file and process it
-        foreach (var pdfFile in pdfFiles)
+    public static User CreateUserRecord(string jsonString)
+    {
+        try
         {
-            Console.WriteLine($"Processing file {pdfFile}");
-            ProcessPdfFiles(pdfFile);
-            
-            string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
+            var record = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonString);
 
-            // Now that we have all the text from the PDF, we can analyze it with AI
-            string aiAnalysisResult = AnalyzeFileWithAI(ocrResultsFile).Result;
-
-            // Write the AI analysis result to a text file
-            using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
+            if (record == null)
             {
-                writer.Write(aiAnalysisResult);
+                return new User();
             }
+
+            User user = new User();
+            user.PatientName = record.ContainsKey("PatientName") ? record["PatientName"] : null;
+
+            if (record.ContainsKey("TotalCharge"))
+            {
+                // Convert the TotalCharge value to a decimal
+                decimal? parsedCharge = ConvertToDecimal(record["TotalCharge"]);
+                if (parsedCharge.HasValue)
+                {
+                    // If parsing was successful, assign the parsed value to the TotalCharge property
+                    user.TotalCharge = parsedCharge.Value;
+                }
+                else
+                {
+                    // If parsing was unsuccessful, set TotalCharge to 0 or any default value
+                    user.TotalCharge = 0;
+                }
+            }
+
+            if (record.ContainsKey("TotalMiles") && int.TryParse(record["TotalMiles"], out int parsedMiles))
+            {
+                user.TotalMiles = parsedMiles;
+            }
+            else
+            {
+                user.TotalMiles = 0;
+            }
+
+            return user;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Could not convert string to User: {ex.Message}");
+            return new User();
         }
     }
 
@@ -94,11 +120,11 @@ class Program
                         }
 
                         // Delete the contour image
-                        File.Delete(contourImage);
+                        //File.Delete(contourImage);
                     }
 
                     // Delete the original image of the page
-                    File.Delete(pageImage);
+                    //File.Delete(pageImage);
                 }
             }
             log.Add(pdfFile);
@@ -120,16 +146,18 @@ class Program
         }
     }
 
-    public static Dictionary<string, string> CreatePatientRecord(string jsonString)
+    public static decimal? ConvertToDecimal(string value)
     {
-        try
+        // Remove the dollar sign and comma, then parse the value as a decimal
+        string numericString = value.Replace("$", "").Replace(",", "");
+        if (decimal.TryParse(numericString, out decimal parsedValue))
         {
-            var record = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonString);
-            return record;
+            // If parsing was successful, return the decimal value
+            return parsedValue;
         }
-        catch (JsonException ex)
+        else
         {
-            Console.WriteLine($"Could not convert string to dictionary: {ex.Message}");
+            // If parsing was unsuccessful, return null
             return null;
         }
     }
@@ -149,7 +177,7 @@ class Program
         var proxy = new OpenAIProxy(apiKey);
 
         // Define the prompt
-        string prompt = $"Given the following text, extract the patient's name and total charge and return the result in JSON format: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": \"John Doe\", \"TotalCharge\": \"$200.00\"}}";
+        string prompt = $"Given the following text, extract the patient's name, total charge, and total miles and return the result in JSON format: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": \"John Doe\", \"TotalMiles\": \"2\", \"TotalCharge\": \"$200.00\"}}";
 
         // Make the API call
         var result = await proxy.Ask(prompt);
@@ -188,6 +216,41 @@ class Program
                     }
                 }
             }
+        }
+    }
+
+    static void Main(string[] args)
+    {
+        // Define the path for the PDF files to be processed
+        var pdfDirectoryPath = Path.Combine(Directory.GetCurrentDirectory(), "PDFs");
+
+        // Check if the directories exist, if not, create them
+        if (!Directory.Exists(pdfDirectoryPath)) Directory.CreateDirectory(pdfDirectoryPath);
+
+        // Get all the PDF files in the directory
+        var pdfFiles = Directory.GetFiles(pdfDirectoryPath, "*.pdf");
+
+        // Loop through each PDF file and process it
+        foreach (var pdfFile in pdfFiles)
+        {
+            Console.WriteLine($"Processing file {pdfFile}");
+            ProcessPdfFiles(pdfFile);
+            
+            string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
+
+            // Now that we have all the text from the PDF, we can analyze it with AI
+            string aiAnalysisResult = AnalyzeFileWithAI(ocrResultsFile).Result;
+
+            // Write the AI analysis result to a text file
+            using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
+            {
+                writer.Write(aiAnalysisResult);
+            }
+            
+            User user = CreateUserRecord(aiAnalysisResult);
+            Console.WriteLine($"Patient name: {user.PatientName}");
+            Console.WriteLine($"Total charge: {user.TotalCharge}");
+            Console.WriteLine($"Total miles: {user.TotalMiles}");
         }
     }
 }
