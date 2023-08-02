@@ -2,6 +2,7 @@
 using Tesseract;
 using Newtonsoft.Json;
 using StringFiltering;
+using System.Text.RegularExpressions;
 
 class Program
 {
@@ -243,6 +244,30 @@ class Program
         return result;
     }
 
+    static Dictionary<string, string> ExtractInfo(string filePath)
+    {
+        // Read the text from the file
+        string text = File.ReadAllText(filePath);
+
+        // Define regular expressions for each piece of information
+        string namePattern = @"PATIENT’S NAME \(Last Name, First Name, Middle Initial\) ([A-Z, ]+)";
+        string chargePattern = @"TOTAL CHARGE \$ ([0-9,.]+)";
+        string milesPattern = @"TOTAL MILES:.* ([0-9\.]+)";
+
+        // Use the regular expressions to find the information
+        Match nameMatch = Regex.Match(text, namePattern);
+        Match chargeMatch = Regex.Match(text, chargePattern);
+        Match milesMatch = Regex.Match(text, milesPattern);
+
+        // Extract the matched groups and return them in a dictionary
+        return new Dictionary<string, string>
+        {
+            {"PatientName", nameMatch.Success ? nameMatch.Groups[1].Value : "Not found"},
+            {"TotalCharge", chargeMatch.Success ? chargeMatch.Groups[1].Value : "Not found"},
+            {"TotalMiles", milesMatch.Success ? milesMatch.Groups[1].Value : "Not found"}
+        };
+    }
+
     static void TestPageSegModes(TesseractEngine engine, string pageImage, int pageNumber)
     {
         // Load the image
@@ -295,17 +320,18 @@ class Program
             
             string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 
-            // Now that we have all the text from the PDF, we can analyze it with AI
+            /*// Now that we have all the text from the PDF, we can analyze it with AI
             string aiAnalysisResult = AnalyzeFileWithAI(ocrResultsFile).Result;
 
             // Write the AI analysis result to a text file
             using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
             {
                 writer.Write(aiAnalysisResult);
-            }
+            }*/
             
             //User user = CreateUserRecord(aiAnalysisResult);
-            Dictionary<string, object> user = CreateDynamicRecord(aiAnalysisResult);
+            //Dictionary<string, object> user = CreateDynamicRecord(aiAnalysisResult);
+            Dictionary<string, string> user = ExtractInfo(ocrResultsFile);
 
             try
             {
