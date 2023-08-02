@@ -28,8 +28,8 @@ public class ImageProcessor
         CvInvoke.FindContours(gray, contours, null, RetrType.List, ChainApproxMethod.ChainApproxSimple);
 
         // Define minimum and maximum dimensions
-        var minDimension = new Size(90, 70);  // change these as needed
-        var maxDimension = new Size(1800, 900);  // change these as needed
+        var minDimension = new Size(90, 90);  // change these as needed
+        var maxDimension = new Size(2500, 1000);  // change these as needed
 
         // Get all bounding rectangles
         List<Rectangle> boundingRects = new List<Rectangle>();

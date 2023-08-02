@@ -1,6 +1,7 @@
 ﻿using BitMiracle.Docotic.Pdf;
 using Tesseract;
 using Newtonsoft.Json;
+using StringFiltering;
 
 class Program
 {
@@ -8,7 +9,7 @@ class Program
     {
         public string PatientName { get; set; }
         public decimal TotalCharge { get; set; }
-        public int TotalMiles { get; set; } // change to match the AI output
+        public decimal TotalMiles { get; set; } // change to match the AI output
         // Add other properties as needed
     }
 
@@ -42,13 +43,20 @@ class Program
                 }
             }
 
-            if (record.ContainsKey("TotalMiles") && int.TryParse(record["TotalMiles"], out int parsedMiles))
+            if (record.ContainsKey("TotalMiles"))
             {
-                user.TotalMiles = parsedMiles;
-            }
-            else
-            {
-                user.TotalMiles = 0;
+                // Convert the TotalMiles value to a decimal
+                decimal? parsedMiles = ConvertToDecimal(record["TotalMiles"]);
+                if (parsedMiles.HasValue)
+                {
+                    // If parsing was successful, assign the parsed value to the TotalMiles property
+                    user.TotalMiles = parsedMiles.Value;
+                }
+                else
+                {
+                    // If parsing was unsuccessful, set TotalMiles to 0 or any default value
+                    user.TotalMiles = 0;
+                }
             }
 
             return user;
@@ -82,6 +90,9 @@ class Program
             {
                 string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 
+                // Create a new instance of StringFilter
+                var filter = new StringFilter();
+
                 // Loop through each page in the PDF
                 for (int i = 0; i < pdf.PageCount; ++i)
                 {
@@ -113,10 +124,16 @@ class Program
                         // Perform OCR on the contour image
                         string ocrText = PageOCR(engine, contourImage);
 
-                        // Append the OCR result to the text file
-                        using (StreamWriter writer = new StreamWriter(ocrResultsFile, append: true))
+                        // Reduce the whitespace in the OCR text
+                        ocrText = filter.ReduceWhitespace(ocrText);
+
+                        // Append the OCR result to the text file only if it's not empty or a newline
+                        if (!string.IsNullOrEmpty(ocrText) && ocrText != "\n")
                         {
-                            writer.WriteLine(ocrText);
+                            using (StreamWriter writer = new StreamWriter(ocrResultsFile, append: true))
+                            {
+                                writer.WriteLine(ocrText);
+                            }
                         }
 
                         // Delete the contour image
