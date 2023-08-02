@@ -68,6 +68,43 @@ class Program
         }
     }
 
+    
+    public static Dictionary<string, object> CreateDynamicRecord(string jsonString)
+    {
+        try
+        {
+            var record = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(jsonString);
+
+            if (record == null)
+            {
+                return new Dictionary<string, object>();
+            }
+
+            var dynamicRecord = new Dictionary<string, object>();
+
+            foreach (var entry in record)
+            {
+                if (entry.Value["type"] == "string")
+                {
+                    dynamicRecord[entry.Key] = entry.Value["value"];
+                }
+                else if (entry.Value["type"] == "decimal")
+                {
+                    decimal? parsedValue = ConvertToDecimal(entry.Value["value"]);
+                    dynamicRecord[entry.Key] = parsedValue.HasValue ? parsedValue.Value : 0;
+                }
+                // handle more types as needed...
+            }
+
+            return dynamicRecord;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Could not convert string to record: {ex.Message}");
+            return new Dictionary<string, object>();
+        }
+    }
+
     static void ProcessPdfFiles(string pdfFile)
     {
         string logFilePath = "log.txt";
@@ -193,8 +230,11 @@ class Program
         // Create an instance of the OpenAIProxy class
         var proxy = new OpenAIProxy(apiKey);
 
-        // Define the prompt
-        string prompt = $"Given the following text, extract the patient's name, total charge, and total miles and return the result in JSON format: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": \"John Doe\", \"TotalMiles\": \"2\", \"TotalCharge\": \"$200.00\"}}";
+        // Define the prompt for json output
+        //string prompt = $"Given the following text, extract the patient's name, total charge, and total miles and return the result in JSON format: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": \"John Doe\", \"TotalMiles\": \"2\", \"TotalCharge\": \"$200.00\"}}";
+
+        // Define the prompt for json output with type information
+        string prompt = $"Given the following text, extract the patient's name, total charge, and total miles and return the result in JSON format where each field is an object with 'type' and 'value' properties: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": {{\"type\": \"string\", \"value\": \"John Doe\"}}, \"TotalMiles\": {{\"type\": \"decimal\", \"value\": \"2\"}}, \"TotalCharge\": {{\"type\": \"decimal\", \"value\": \"200.00\"}}}}";
 
         // Make the API call
         var result = await proxy.Ask(prompt);
@@ -264,10 +304,36 @@ class Program
                 writer.Write(aiAnalysisResult);
             }
             
-            User user = CreateUserRecord(aiAnalysisResult);
-            Console.WriteLine($"Patient name: {user.PatientName}");
-            Console.WriteLine($"Total charge: {user.TotalCharge}");
-            Console.WriteLine($"Total miles: {user.TotalMiles}");
+            //User user = CreateUserRecord(aiAnalysisResult);
+            Dictionary<string, object> user = CreateDynamicRecord(aiAnalysisResult);
+
+            try
+            {
+                Console.WriteLine($"Patient name: {user["PatientName"]}");
+            }
+            catch (KeyNotFoundException)
+            {
+                Console.WriteLine("PatientName not found in the data.");
+            }
+
+            try
+            {
+                Console.WriteLine($"Total charge: {user["TotalCharge"]}");
+            }
+            catch (KeyNotFoundException)
+            {
+                Console.WriteLine("TotalCharge not found in the data.");
+            }
+
+            try
+            {
+                Console.WriteLine($"Total miles: {user["TotalMiles"]}");
+            }
+            catch (KeyNotFoundException)
+            {
+                Console.WriteLine("TotalMiles not found in the data.");
+            }
+
         }
     }
 }
