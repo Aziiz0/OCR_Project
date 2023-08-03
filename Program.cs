@@ -69,7 +69,6 @@ class Program
         }
     }
 
-    
     public static Dictionary<string, object> CreateDynamicRecord(string jsonString)
     {
         try
