@@ -8,7 +8,6 @@ namespace StringFiltering
         {
             string noNewLines = input.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
             string normalized = Regex.Replace(noNewLines, @"\s+", " ");
-            RemoveRepeatingNewLines(normalized);
             return normalized.Trim();
         }
 

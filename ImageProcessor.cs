@@ -20,16 +20,16 @@ public class ImageProcessor
         // Convert the image to grayscale
         using var gray = src.Convert<Gray, byte>();
 
-        // Threshold the image to get a binary image
-        CvInvoke.Threshold(gray, gray, 127, 255, ThresholdType.Binary);
+        // Adaptive Thresholding
+        CvInvoke.AdaptiveThreshold(gray, gray, 255, AdaptiveThresholdType.GaussianC, ThresholdType.Binary, 11, 2);
 
         // Find contours
         using var contours = new VectorOfVectorOfPoint();
         CvInvoke.FindContours(gray, contours, null, RetrType.List, ChainApproxMethod.ChainApproxSimple);
 
         // Define minimum and maximum dimensions
-        var minDimension = new Size(90, 90);  // change these as needed
-        var maxDimension = new Size(2500, 1000);  // change these as needed
+        var minDimension = new Size((int)(src.Width / 11), (int)(src.Height / 35));  // set min width and height
+        var maxDimension = new Size((int)(src.Width / 1.4), (int)(src.Height / 3));  // set max width and height
 
         // Get all bounding rectangles
         List<Rectangle> boundingRects = new List<Rectangle>();
@@ -62,6 +62,12 @@ public class ImageProcessor
 
                 contourImages.Add(contourImage);
             }
+        }
+
+        // If no contours were found, add the original image to the list
+        if (contourImages.Count == 0)
+        {
+            contourImages.Add(imagePath);
         }
 
         return contourImages;

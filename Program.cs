@@ -1,7 +1,5 @@
-﻿using BitMiracle.Docotic.Pdf;
-using Tesseract;
+﻿using Tesseract;
 using Newtonsoft.Json;
-using StringFiltering;
 using System.Text.RegularExpressions;
 
 class Program
@@ -69,7 +67,6 @@ class Program
         }
     }
 
-    
     public static Dictionary<string, object> CreateDynamicRecord(string jsonString)
     {
         try
@@ -106,101 +103,6 @@ class Program
         }
     }
 
-    static void ProcessPdfFiles(string pdfFile)
-    {
-        string logFilePath = "log.txt";
-
-        // Load the log file
-        List<string> log = File.Exists(logFilePath) ? File.ReadAllLines(logFilePath).ToList() : new List<string>();
-
-        // If this PDF has already been processed, skip it
-        if (log.Contains(pdfFile))
-        {
-            Console.WriteLine($"Skipping file {pdfFile} because it has already been processed.");
-            return;
-        }
-
-        // Load the PDF document
-        using (var pdf = new PdfDocument(pdfFile))
-        {
-            // Initialize Tesseract OCR engine
-            using (var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default))
-            {
-                string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
-
-                // Create a new instance of StringFilter
-                var filter = new StringFilter();
-
-                // Loop through each page in the PDF
-                for (int i = 0; i < pdf.PageCount; ++i)
-                {
-                    PdfPage page = pdf.Pages[i];
-                    string searchableText = page.GetText();
-
-                    // If the page contains searchable text, skip this page
-                    if (!string.IsNullOrEmpty(searchableText.Trim()))
-                    {
-                        continue;
-                    }
-
-                    // The page does not contain searchable text.
-                    // Save it as a high-resolution image
-                    PdfDrawOptions options = PdfDrawOptions.Create();
-                    options.BackgroundColor = new PdfRgbColor(255, 255, 255);
-                    options.HorizontalResolution = 300;
-                    options.VerticalResolution = 300;
-
-                    string pageImage = $"page_{i}.png";
-                    page.Save(pageImage, options);
-
-                    // Extract the contours from the image
-                    var contourImages = ImageProcessor.ExtractContours(pageImage, i);
-
-                    // Perform OCR on each contour image and delete it afterwards
-                    foreach(var contourImage in contourImages)
-                    {
-                        // Perform OCR on the contour image
-                        string ocrText = PageOCR(engine, contourImage);
-
-                        // Reduce the whitespace in the OCR text
-                        ocrText = filter.ReduceWhitespace(ocrText);
-
-                        // Append the OCR result to the text file only if it's not empty or a newline
-                        if (!string.IsNullOrEmpty(ocrText) && ocrText != "\n")
-                        {
-                            using (StreamWriter writer = new StreamWriter(ocrResultsFile, append: true))
-                            {
-                                writer.WriteLine(ocrText);
-                            }
-                        }
-
-                        // Delete the contour image
-                        //File.Delete(contourImage);
-                    }
-
-                    // Delete the original image of the page
-                    //File.Delete(pageImage);
-                }
-            }
-            log.Add(pdfFile);
-            File.WriteAllLines(logFilePath, log);
-        }
-    }
-
-    static string PageOCR(TesseractEngine engine, string contourImage)
-    {
-        // Load the image
-        using (Pix img = Pix.LoadFromFile(contourImage))
-        {
-            // Perform OCR on the image
-            using (Page recognizedPage = engine.Process(img))
-            {
-                // Return the recognized text
-                return recognizedPage.GetText();
-            }
-        }
-    }
-
     public static decimal? ConvertToDecimal(string value)
     {
         // Remove the dollar sign and comma, then parse the value as a decimal
@@ -217,54 +119,41 @@ class Program
         }
     }
 
-    public static async Task<string> AnalyzeFileWithAI(string filePath)
-    {
-        string text = File.ReadAllText(filePath);
-        return await AnalyzeTextWithAI(text);
-    }
-
-    public static async Task<string> AnalyzeTextWithAI(string text)
-    {
-        // Initialize the OpenAI API with your API key
-        string apiKey = Environment.GetEnvironmentVariable("OpenAi_API_Key") ?? throw new Exception("OpenAI API key not found");
-
-        // Create an instance of the OpenAIProxy class
-        var proxy = new OpenAIProxy(apiKey);
-
-        // Define the prompt for json output
-        //string prompt = $"Given the following text, extract the patient's name, total charge, and total miles and return the result in JSON format: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": \"John Doe\", \"TotalMiles\": \"2\", \"TotalCharge\": \"$200.00\"}}";
-
-        // Define the prompt for json output with type information
-        string prompt = $"Given the following text, extract the patient's name, total charge, and total miles and return the result in JSON format where each field is an object with 'type' and 'value' properties: \n\n{text}\n\nExample output: \n\n{{\"PatientName\": {{\"type\": \"string\", \"value\": \"John Doe\"}}, \"TotalMiles\": {{\"type\": \"decimal\", \"value\": \"2\"}}, \"TotalCharge\": {{\"type\": \"decimal\", \"value\": \"200.00\"}}}}";
-
-        // Make the API call
-        var result = await proxy.Ask(prompt);
-
-        // Return the result
-        return result;
-    }
-
-    static Dictionary<string, string> ExtractInfo(string filePath)
+    static Dictionary<string, object> ExtractInfo(string filePath)
     {
         // Read the text from the file
         string text = File.ReadAllText(filePath);
 
         // Define regular expressions for each piece of information
-        string namePattern = @"PATIENT’S NAME \(Last Name, First Name, Middle Initial\) ([A-Z, ]+)";
+        string namePattern = @"PATIENT\W*S NAME \(Last Name, First Name, Middle Initial\) ([A-Z, ]+)";
         string chargePattern = @"TOTAL CHARGE \$ ([0-9,.]+)";
-        string milesPattern = @"TOTAL MILES:.* ([0-9\.]+)";
+        List<string> diagnoses = new List<string>();
+        string[] parts = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L" };
+
+        foreach (string part in parts)
+        {
+            string diagnosisPattern = $@"{part}\.? (?:{part}(?:L)? )?([A-Z0-9]{{3}}\.[A-Z0-9]{{3,4}})";
+            Match m = Regex.Match(text, diagnosisPattern);
+            if (m.Success)
+            {
+                diagnoses.Add(m.Groups[1].Value);
+            }
+            else
+            {
+                break;
+            }
+        }
 
         // Use the regular expressions to find the information
         Match nameMatch = Regex.Match(text, namePattern);
         Match chargeMatch = Regex.Match(text, chargePattern);
-        Match milesMatch = Regex.Match(text, milesPattern);
 
         // Extract the matched groups and return them in a dictionary
-        return new Dictionary<string, string>
+        return new Dictionary<string, object>
         {
             {"PatientName", nameMatch.Success ? nameMatch.Groups[1].Value : "Not found"},
             {"TotalCharge", chargeMatch.Success ? chargeMatch.Groups[1].Value : "Not found"},
-            {"TotalMiles", milesMatch.Success ? milesMatch.Groups[1].Value : "Not found"}
+            {"Diagnosis", diagnoses.Count > 0 ? diagnoses : new List<string> { "Not found" }}
         };
     }
 
@@ -312,16 +201,23 @@ class Program
         // Get all the PDF files in the directory
         var pdfFiles = Directory.GetFiles(pdfDirectoryPath, "*.pdf");
 
+        // Create an instance of PDFProcessor
+        var processor = new PDFProcessor(@"./tessdata", @"C:\Users\adeeb\OneDrive\Documents\GitHub\PDFToImage\dist\pdf_to_images.exe");
+
+        // Specify the pages you want to process
+        List<int> pagesToProcess = new List<int> { 1 };
+
         // Loop through each PDF file and process it
         foreach (var pdfFile in pdfFiles)
         {
             Console.WriteLine($"Processing file {pdfFile}");
-            ProcessPdfFiles(pdfFile);
-            
+            processor.ProcessPdf(pdfFile, pagesToProcess);
+
             string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 
+
             /*// Now that we have all the text from the PDF, we can analyze it with AI
-            string aiAnalysisResult = AnalyzeFileWithAI(ocrResultsFile).Result;
+            string aiAnalysisResult = await AIChat.AnalyzeFileWithAI(ocrResultsFile).Result;
 
             // Write the AI analysis result to a text file
             using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
@@ -331,7 +227,7 @@ class Program
             
             //User user = CreateUserRecord(aiAnalysisResult);
             //Dictionary<string, object> user = CreateDynamicRecord(aiAnalysisResult);
-            Dictionary<string, string> user = ExtractInfo(ocrResultsFile);
+            Dictionary<string, object> user = ExtractInfo(ocrResultsFile);
 
             try
             {
@@ -353,13 +249,17 @@ class Program
 
             try
             {
-                Console.WriteLine($"Total miles: {user["TotalMiles"]}");
+                List<string> diagnoses = user["Diagnosis"] as List<string>;
+                Console.WriteLine("Diagnoses:");
+                foreach (string diagnosis in diagnoses)
+                {
+                    Console.WriteLine(diagnosis);
+                }
             }
             catch (KeyNotFoundException)
             {
-                Console.WriteLine("TotalMiles not found in the data.");
+                Console.WriteLine("Diagnosis not found in the data.");
             }
-
         }
     }
 }
