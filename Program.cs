@@ -8,7 +8,7 @@ class Program
     {
         public string PatientName { get; set; }
         public decimal TotalCharge { get; set; }
-        public decimal TotalMiles { get; set; } // change to match the AI output
+        public decimal TotalMiles { get; set; }
         // Add other properties as needed
     }
 
@@ -127,21 +127,34 @@ class Program
         // Define regular expressions for each piece of information
         string namePattern = @"PATIENT\W*S NAME \(Last Name, First Name, Middle Initial\) ([A-Z, ]+)";
         string chargePattern = @"TOTAL CHARGE \$ ([0-9,.]+)";
-        List<string> diagnoses = new List<string>();
-        string[] parts = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L" };
-
-        foreach (string part in parts)
+        
+        // Find the start of the diagnosis section
+        string diagnosisSectionPattern = @"21\. DIAGNOSIS.*";
+        Match diagnosisSectionMatch = Regex.Match(text, diagnosisSectionPattern);
+        if (!diagnosisSectionMatch.Success)
         {
-            string diagnosisPattern = $@"{part}\.? (?:{part}(?:L)? )?([A-Z0-9]{{3}}\.[A-Z0-9]{{3,4}})";
-            Match m = Regex.Match(text, diagnosisPattern);
-            if (m.Success)
+            // If we can't find the start of the diagnosis section, we can't extract any diagnoses
+            return new Dictionary<string, object>
             {
-                diagnoses.Add(m.Groups[1].Value);
-            }
-            else
-            {
-                break;
-            }
+                {"PatientName", Regex.Match(text, namePattern).Groups[1].Value},
+                {"TotalCharge", Regex.Match(text, chargePattern).Groups[1].Value},
+                {"Diagnosis", new List<string>()}
+            };
+        }
+
+        // Get the text starting from the diagnosis section
+        string diagnosisText = text.Substring(diagnosisSectionMatch.Index);
+
+        // Define a regular expression for the diagnosis codes
+        string diagnosisCodePattern = @"([A-Z0-9]{3}\.[A-Z0-9]{3,4})";
+        Regex diagnosisCodeRegex = new Regex(diagnosisCodePattern);
+        
+        // Find all diagnosis codes
+        MatchCollection diagnosisMatches = diagnosisCodeRegex.Matches(diagnosisText);
+        List<string> diagnoses = new List<string>();
+        foreach (Match match in diagnosisMatches)
+        {
+            diagnoses.Add(match.Groups[1].Value);
         }
 
         // Use the regular expressions to find the information
