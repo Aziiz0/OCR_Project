@@ -2,6 +2,10 @@ using System.Diagnostics;
 using Tesseract;
 using StringFiltering;
 using PdfiumViewer;
+using System.Text.RegularExpressions;
+using System.Text;
+using System.IO;
+using System.Drawing;
 
 public class PDFProcessor
 {
@@ -31,7 +35,7 @@ public class PDFProcessor
         string outputBase = $"output_{Path.GetFileNameWithoutExtension(pdfFile)}";
 
         // Initialize Tesseract OCR engine
-        using (var engine = new TesseractEngine(tessdataDir, "eng", EngineMode.Default))
+        using (var engine = new TesseractEngine(tessdataDir, "eng", EngineMode.TesseractAndLstm))
         {
             string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 
@@ -53,7 +57,7 @@ public class PDFProcessor
                 foreach (var contourImage in contourImages)
                 {
                     // Perform OCR on the contour image
-                    string ocrText = PageOCR(engine, contourImage);
+                    string ocrText = PageOCR(engine, contourImage, 0.85f);
 
                     // Reduce the whitespace in the OCR text
                     ocrText = filter.ReduceWhitespace(ocrText);
@@ -106,17 +110,99 @@ public class PDFProcessor
         }
     }
 
-
-
-
-    private string PageOCR(TesseractEngine engine, string imageFile)
+    private string PageOCR(TesseractEngine engine, string imageFile, float confidenceThreshold = 0.75f)
     {
+        StringBuilder filteredText = new StringBuilder();
+
+        // 1. Detect checkboxes
+        var checkedBoxes = ImageProcessor.DetectCheckBoxes(imageFile, 0.75);
+
+        // OCR Processing
         using (var img = Pix.LoadFromFile(imageFile))
         {
             using (var page = engine.Process(img))
             {
-                return page.GetText();
+                using (var iter = page.GetIterator())
+                {
+                    iter.Begin();
+                    do
+                    {
+                        float confidence = iter.GetConfidence(PageIteratorLevel.Word);
+                        if (confidence >= confidenceThreshold)
+                        {
+                            var word = iter.GetText(PageIteratorLevel.Word);
+                            filteredText.Append(word + " ");
+                        }
+                    } while (iter.Next(PageIteratorLevel.Word));
+                }
+            }
+        }
+
+        // 3. Append the detected checkbox position to the result string
+        foreach (var box in checkedBoxes)
+        {
+            filteredText.Append($"BOX: {box} ");
+        }
+
+        return filteredText.ToString().Trim();
+    }
+
+
+    public static void AddFieldToDictionaryFromPattern(Dictionary<string, object> dataDict, string text, string pattern, string fieldName)
+    {
+        Match match = Regex.Match(text, pattern, RegexOptions.Multiline);
+        
+        // Debug prints to understand the match
+        // Console.WriteLine($"Trying to match pattern: {pattern}");
+        if (match.Success)
+        {
+            // Console.WriteLine("Matched!");
+
+            // for (int i = 0; i < match.Groups.Count; i++)
+            // {
+            //     Console.WriteLine($"Group {i}: {match.Groups[i].Value}");
+            // }
+
+            dataDict[fieldName] = string.Concat(match.Groups[1].Value, match.Groups[2].Value, match.Groups[3].Value);
+        }
+        else
+        {
+            Console.WriteLine("No match found!");
+            dataDict[fieldName] = "Not found";
+        }
+    }
+
+    public static void AddListFieldToDictionaryFromPattern(Dictionary<string, object> dataDict, string text, string pattern, string fieldName)
+    {
+        MatchCollection matches = Regex.Matches(text, pattern, RegexOptions.Multiline);
+        List<string> results = new List<string>();
+
+        foreach (Match match in matches)
+        {
+            if (match.Success && match.Groups.Count > 1)
+            {
+                results.Add(match.Groups[1].Value);
+            }
+        }
+
+        if (results.Count == 0)
+        {
+            results.Add("Not found");
+        }
+
+        dataDict[fieldName] = results;
+    }
+
+    public static void CleanDictionaryValues(Dictionary<string, object> dataDict)
+    {
+        var keys = dataDict.Keys.ToList();
+        foreach (var key in keys)
+        {
+            if (dataDict[key] is string stringValue)
+            {
+                dataDict[key] = Regex.Replace(stringValue, @"\s+,", ",");
             }
         }
     }
+
 }

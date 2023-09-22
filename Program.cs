@@ -1,207 +1,12 @@
 ﻿using Tesseract;
 using Newtonsoft.Json;
-using System.Text.RegularExpressions;
 
 class Program
 {
-    public class User
-    {
-        public string PatientName { get; set; }
-        public decimal TotalCharge { get; set; }
-        public decimal TotalMiles { get; set; }
-        // Add other properties as needed
-    }
-
-    public static User CreateUserRecord(string jsonString)
-    {
-        try
-        {
-            var record = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonString);
-
-            if (record == null)
-            {
-                return new User();
-            }
-
-            User user = new User();
-            user.PatientName = record.ContainsKey("PatientName") ? record["PatientName"] : null;
-
-            if (record.ContainsKey("TotalCharge"))
-            {
-                // Convert the TotalCharge value to a decimal
-                decimal? parsedCharge = ConvertToDecimal(record["TotalCharge"]);
-                if (parsedCharge.HasValue)
-                {
-                    // If parsing was successful, assign the parsed value to the TotalCharge property
-                    user.TotalCharge = parsedCharge.Value;
-                }
-                else
-                {
-                    // If parsing was unsuccessful, set TotalCharge to 0 or any default value
-                    user.TotalCharge = 0;
-                }
-            }
-
-            if (record.ContainsKey("TotalMiles"))
-            {
-                // Convert the TotalMiles value to a decimal
-                decimal? parsedMiles = ConvertToDecimal(record["TotalMiles"]);
-                if (parsedMiles.HasValue)
-                {
-                    // If parsing was successful, assign the parsed value to the TotalMiles property
-                    user.TotalMiles = parsedMiles.Value;
-                }
-                else
-                {
-                    // If parsing was unsuccessful, set TotalMiles to 0 or any default value
-                    user.TotalMiles = 0;
-                }
-            }
-
-            return user;
-        }
-        catch (JsonException ex)
-        {
-            Console.WriteLine($"Could not convert string to User: {ex.Message}");
-            return new User();
-        }
-    }
-
-    public static Dictionary<string, object> CreateDynamicRecord(string jsonString)
-    {
-        try
-        {
-            var record = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(jsonString);
-
-            if (record == null)
-            {
-                return new Dictionary<string, object>();
-            }
-
-            var dynamicRecord = new Dictionary<string, object>();
-
-            foreach (var entry in record)
-            {
-                if (entry.Value["type"] == "string")
-                {
-                    dynamicRecord[entry.Key] = entry.Value["value"];
-                }
-                else if (entry.Value["type"] == "decimal")
-                {
-                    decimal? parsedValue = ConvertToDecimal(entry.Value["value"]);
-                    dynamicRecord[entry.Key] = parsedValue.HasValue ? parsedValue.Value : 0;
-                }
-                // handle more types as needed...
-            }
-
-            return dynamicRecord;
-        }
-        catch (JsonException ex)
-        {
-            Console.WriteLine($"Could not convert string to record: {ex.Message}");
-            return new Dictionary<string, object>();
-        }
-    }
-
-    public static decimal? ConvertToDecimal(string value)
-    {
-        // Remove the dollar sign and comma, then parse the value as a decimal
-        string numericString = value.Replace("$", "").Replace(",", "");
-        if (decimal.TryParse(numericString, out decimal parsedValue))
-        {
-            // If parsing was successful, return the decimal value
-            return parsedValue;
-        }
-        else
-        {
-            // If parsing was unsuccessful, return null
-            return null;
-        }
-    }
-
-    static Dictionary<string, object> ExtractInfo(string filePath)
-    {
-        // Read the text from the file
-        string text = File.ReadAllText(filePath);
-
-        // Define regular expressions for each piece of information
-        string namePattern = @"PATIENT\W*S NAME \(Last Name, First Name, Middle Initial\) ([A-Z, ]+)";
-        string chargePattern = @"TOTAL CHARGE \$ ([0-9,.]+)";
-        
-        // Find the start of the diagnosis section
-        string diagnosisSectionPattern = @"21\. DIAGNOSIS.*";
-        Match diagnosisSectionMatch = Regex.Match(text, diagnosisSectionPattern);
-        if (!diagnosisSectionMatch.Success)
-        {
-            // If we can't find the start of the diagnosis section, we can't extract any diagnoses
-            return new Dictionary<string, object>
-            {
-                {"PatientName", Regex.Match(text, namePattern).Groups[1].Value},
-                {"TotalCharge", Regex.Match(text, chargePattern).Groups[1].Value},
-                {"Diagnosis", new List<string>()}
-            };
-        }
-
-        // Get the text starting from the diagnosis section
-        string diagnosisText = text.Substring(diagnosisSectionMatch.Index);
-
-        // Define a regular expression for the diagnosis codes
-        string diagnosisCodePattern = @"([A-Z0-9]{3}\.[A-Z0-9]{3,4})";
-        Regex diagnosisCodeRegex = new Regex(diagnosisCodePattern);
-        
-        // Find all diagnosis codes
-        MatchCollection diagnosisMatches = diagnosisCodeRegex.Matches(diagnosisText);
-        List<string> diagnoses = new List<string>();
-        foreach (Match match in diagnosisMatches)
-        {
-            diagnoses.Add(match.Groups[1].Value);
-        }
-
-        // Use the regular expressions to find the information
-        Match nameMatch = Regex.Match(text, namePattern);
-        Match chargeMatch = Regex.Match(text, chargePattern);
-
-        // Extract the matched groups and return them in a dictionary
-        return new Dictionary<string, object>
-        {
-            {"PatientName", nameMatch.Success ? nameMatch.Groups[1].Value : "Not found"},
-            {"TotalCharge", chargeMatch.Success ? chargeMatch.Groups[1].Value : "Not found"},
-            {"Diagnosis", diagnoses.Count > 0 ? diagnoses : new List<string> { "Not found" }}
-        };
-    }
-
-    static void TestPageSegModes(TesseractEngine engine, string pageImage, int pageNumber)
-    {
-        // Load the image
-        using (Pix img = Pix.LoadFromFile(pageImage))
-        {
-            // Define the output file path.
-            string outputFilePath = $"test_output_page_{pageNumber}.txt";
-
-            // Create a new StreamWriter.
-            using (StreamWriter writer = new StreamWriter(outputFilePath, append: true))
-            {
-                // Iterate over all the PageSegMode values
-                foreach (PageSegMode mode in Enum.GetValues(typeof(PageSegMode)))
-                {
-                    if (mode == PageSegMode.OsdOnly)
-                    {
-                        continue;  // Skip OsdOnly mode
-                    }
-
-                    // Perform OCR using the current PageSegMode
-                    using (Page recognizedPage = engine.Process(img, mode))
-                    {
-                        // Write the OCR results to the output file
-                        writer.WriteLine($"Testing mode {mode} on page {pageNumber}");
-                        writer.WriteLine($"Mean confidence: {recognizedPage.GetMeanConfidence()}");
-                        writer.WriteLine($"Text: {recognizedPage.GetText()}");
-                        writer.WriteLine();
-                    }
-                }
-            }
-        }
-    }
+    // static void Main(string[] args)
+    // {
+    //     ImageProcessor.DetectTopLeftCorners("output_WPH1H0BYBYD_1.png", 90);
+    // }
 
     static void Main(string[] args)
     {
@@ -228,50 +33,133 @@ class Program
 
             string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 
+            string text = File.ReadAllText(ocrResultsFile);
 
-            /*// Now that we have all the text from the PDF, we can analyze it with AI
-            string aiAnalysisResult = await AIChat.AnalyzeFileWithAI(ocrResultsFile).Result;
+            // Dictionary<string, object> user = ExtractInfo(ocrResultsFile);
+            Dictionary<string, object> user = new Dictionary<string, object>();
 
-            // Write the AI analysis result to a text file
-            using (StreamWriter writer = new StreamWriter("ai_analysis_result.txt"))
-            {
-                writer.Write(aiAnalysisResult);
-            }*/
-            
-            //User user = CreateUserRecord(aiAnalysisResult);
-            //Dictionary<string, object> user = CreateDynamicRecord(aiAnalysisResult);
-            Dictionary<string, object> user = ExtractInfo(ocrResultsFile);
 
-            try
-            {
-                Console.WriteLine($"Patient name: {user["PatientName"]}");
-            }
-            catch (KeyNotFoundException)
-            {
-                Console.WriteLine("PatientName not found in the data.");
-            }
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^1a\.\s*INSURED’S I\.D\. NUMBER.*\)\s*(\d+)", "ID");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^2\..*?\)\s*([A-Z]+\s*,\s*[A-Z]+(?:\s*,\s*[A-Z])?)", "PatientName");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^3\..*?(\d+).*?(\d+).*?(\d+)", "DateOfBirth");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^4\..*?\)\s*([A-Z]+\s*,\s*[A-Z]+(?:\s*,\s*[A-Z])?)", "InsuredName");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^5\..*?\)\s*(.+)$", "PatientAddress");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^5\..*?(?:.*?\n){3}CITY\s+(.*?)(?=\n)", "PatientCity");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^5\..*?(?:.*?\n){4}STATE\s+(.*?)(?=\n)", "PatientState");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^5\..*?(?:.*?\n){10}ZIP CODE\s*(.*)", "PatientZip");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^5\..*?(?:.*?\n){11}.*?\)\s*(.*)", "PatientTelephone");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^7\..*?\)\s*(.+)$", "InsuredAddress");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^7\..*?(?:.*?\n){4}CITY\s+(.*?)(?=\n)", "InsuredCity");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^7\..*?(?:.*?\n){5}STATE\s+(.*?)(?=\n)", "InsuredState");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^7\..*?(?:.*?\n){6}ZIP CODE\s*(.*)", "InsuredZip");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^7\..*?(?:.*?\n){7}.*?\)\s*(.*)", "InsuredTelephone");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^11\..*?(\d+)", "InsuredPolicyNumber");
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"^11\..*?(?:.*?\n){2}.*?(\d+).*?(\d+).*?(\d+)", "InsuredDOB");
 
-            try
-            {
-                Console.WriteLine($"Total charge: {user["TotalCharge"]}");
-            }
-            catch (KeyNotFoundException)
-            {
-                Console.WriteLine("TotalCharge not found in the data.");
-            }
+            PDFProcessor.AddFieldToDictionaryFromPattern(user, text, @"TOTAL CHARGE \$ ([0-9,.]+)", "TotalCharge");
 
-            try
+            // Handling the diagnosis section using the list function
+            PDFProcessor.AddListFieldToDictionaryFromPattern(user, text, @"^21.*?([A-Z0-9]{3}\.[A-Z0-9]{3,4})", "Diagnosis");
+
+            PDFProcessor.CleanDictionaryValues(user);
+
+
             {
-                List<string> diagnoses = user["Diagnosis"] as List<string>;
-                Console.WriteLine("Diagnoses:");
-                foreach (string diagnosis in diagnoses)
+                try// 1a
                 {
-                    Console.WriteLine(diagnosis);
+                    Console.WriteLine($"ID: {user["ID"]}");
                 }
-            }
-            catch (KeyNotFoundException)
-            {
-                Console.WriteLine("Diagnosis not found in the data.");
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("ID not found in the data.");
+                }
+
+                try// 2
+                {
+                    Console.WriteLine($"Patient name: {user["PatientName"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("PatientName not found in the data.");
+                }
+
+                try// 3
+                {
+                    Console.WriteLine($"Date of Birth: {user["DateOfBirth"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("DateOfBirth not found in the data.");
+                }
+                
+                try// 4
+                {
+                    Console.WriteLine($"Insured name: {user["InsuredName"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("InsuredName not found in the data.");
+                }
+
+                try// 5
+                {
+                    Console.WriteLine($"Patient address: {user["PatientAddress"]}");
+                    Console.WriteLine($"Patient city: {user["PatientCity"]}");
+                    Console.WriteLine($"Patient state: {user["PatientState"]}");
+                    Console.WriteLine($"Patient zip: {user["PatientZip"]}");
+                    Console.WriteLine($"Patient telephone: {user["PatientTelephone"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("PatientAddress not found in the data.");
+                }
+
+                try// 7
+                {
+                    Console.WriteLine($"Insured address: {user["InsuredAddress"]}");
+                    Console.WriteLine($"Insured city: {user["InsuredCity"]}");
+                    Console.WriteLine($"Insured state: {user["InsuredState"]}");
+                    Console.WriteLine($"Insured zip: {user["InsuredZip"]}");
+                    Console.WriteLine($"Insured telephone: {user["InsuredTelephone"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("InsuredAddress not found in the data.");
+                }
+
+                try// 11
+                {
+                    Console.WriteLine($"Insured policy number: {user["InsuredPolicyNumber"]}");
+                    Console.WriteLine($"Insured DOB: {user["InsuredDOB"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("InsuredPolicyNumber not found in the data.");
+                }
+
+                try
+                {
+                    Console.WriteLine($"Total charge: {user["TotalCharge"]}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("TotalCharge not found in the data.");
+                }
+                
+                try
+                {
+                    List<string> diagnoses = user["Diagnosis"] as List<string>;
+                    Console.WriteLine("Diagnoses:");
+                    foreach (string diagnosis in diagnoses)
+                    {
+                        Console.WriteLine(diagnosis);
+                    }
+                }
+                catch (KeyNotFoundException)
+                {
+                    Console.WriteLine("Diagnosis not found in the data.");
+                }
+
             }
         }
     }
