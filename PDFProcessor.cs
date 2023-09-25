@@ -1,11 +1,15 @@
 using System.Diagnostics;
+using System.Drawing;
+using Emgu.CV;
+using Emgu.CV.CvEnum;
+using Emgu.CV.Structure;
+using Emgu.CV.Util;
 using Tesseract;
 using StringFiltering;
 using PdfiumViewer;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.IO;
-using System.Drawing;
 
 public class PDFProcessor
 {
@@ -49,13 +53,32 @@ public class PDFProcessor
 
                 // Call Python script to convert the specific PDF page to image
                 ConvertPdfPageToImage(pdfFile, page, pageImage);
+                using var src = new Image<Bgr, byte>(pageImage);
+                var minDimension = new Size((int)(src.Width / 30), (int)(src.Height / 35));  // set min width and height
+                var maxDimension = new Size((int)(src.Width / 1.4), (int)(src.Height / 3));  // set max width and height
 
                 // Extract the contours from the image
-                var contourImages = ImageProcessor.ExtractContours(pageImage, page);
+                // var contourImages = ImageProcessor.ExtractContours(pageImage, 1, 11, 2, minDimension, maxDimension);
+                Size optimizedMinDimension = new Size(91, 104);
+                Size optimizedMaxDimension = new Size(3645, 2349);
+                int optimizedBlockSize = 13;
+                int optimizedCValue = -2;
+                // Size optimizedMinDimension = new Size(243, 234);
+                // Size optimizedMaxDimension = new Size(7290, 9396);
+                // int optimizedBlockSize = 3;
+                // int optimizedCValue = 2;
+                // Size optimizedMinDimension = new Size(91, 117);
+                // Size optimizedMaxDimension = new Size(3645, 2349);
+                // int optimizedBlockSize = 13;
+                // int optimizedCValue = -4;
+
+                var contourData = ImageProcessor.ExtractContours(pageImage, 1, optimizedBlockSize, optimizedCValue, optimizedMinDimension, optimizedMaxDimension);
 
                 // Perform OCR on each contour image and delete it afterwards
-                foreach (var contourImage in contourImages)
+                foreach (var data in contourData)
                 {
+                    string contourImage = data.Item1; // This is the path of the image
+
                     // Perform OCR on the contour image
                     string ocrText = PageOCR(engine, contourImage, 0.85f);
 
@@ -74,6 +97,7 @@ public class PDFProcessor
                     // Delete the contour image
                     //File.Delete(contourImage);
                 }
+
 
                 // Delete the original image of the page
                 //File.Delete(pageImage);
@@ -107,15 +131,18 @@ public class PDFProcessor
             var image = document.Render(pageNumber - 1, desiredWidth, height, dpi, dpi, PdfRotation.Rotate0, PdfRenderFlags.CorrectFromDpi);
 
             image.Save(outputImage, System.Drawing.Imaging.ImageFormat.Png);
+
+            // Call the FixBoxAboveText function to correct the image
+            ImageProcessor.FixBoxAboveText(outputImage, "E.", "F.");
         }
     }
 
-    private string PageOCR(TesseractEngine engine, string imageFile, float confidenceThreshold = 0.75f)
+    public static string PageOCR(TesseractEngine engine, string imageFile, float confidenceThreshold = 0.75f)
     {
         StringBuilder filteredText = new StringBuilder();
 
         // 1. Detect checkboxes
-        var checkedBoxes = ImageProcessor.DetectCheckBoxes(imageFile, 0.75);
+        // var checkedBoxes = ImageProcessor.DetectCheckBoxes(imageFile, 0.75);
 
         // OCR Processing
         using (var img = Pix.LoadFromFile(imageFile))
@@ -139,14 +166,13 @@ public class PDFProcessor
         }
 
         // 3. Append the detected checkbox position to the result string
-        foreach (var box in checkedBoxes)
-        {
-            filteredText.Append($"BOX: {box} ");
-        }
+        // foreach (var box in checkedBoxes)
+        // {
+        //     filteredText.Append($"BOX: {box} ");
+        // }
 
         return filteredText.ToString().Trim();
     }
-
 
     public static void AddFieldToDictionaryFromPattern(Dictionary<string, object> dataDict, string text, string pattern, string fieldName)
     {
@@ -172,7 +198,7 @@ public class PDFProcessor
         }
     }
 
-    public static void AddListFieldToDictionaryFromPattern(Dictionary<string, object> dataDict, string text, string pattern, string fieldName)
+    public static bool AddListFieldToDictionaryFromPattern(Dictionary<string, object> dataDict, string text, string pattern, string fieldName)
     {
         MatchCollection matches = Regex.Matches(text, pattern, RegexOptions.Multiline);
         List<string> results = new List<string>();
@@ -188,9 +214,11 @@ public class PDFProcessor
         if (results.Count == 0)
         {
             results.Add("Not found");
+            return false;
         }
 
         dataDict[fieldName] = results;
+        return true;
     }
 
     public static void CleanDictionaryValues(Dictionary<string, object> dataDict)
@@ -204,5 +232,6 @@ public class PDFProcessor
             }
         }
     }
+
 
 }
