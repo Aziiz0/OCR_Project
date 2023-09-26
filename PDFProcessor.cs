@@ -142,7 +142,7 @@ public class PDFProcessor
         StringBuilder filteredText = new StringBuilder();
 
         // 1. Detect checkboxes
-        // var checkedBoxes = ImageProcessor.DetectCheckBoxes(imageFile, 0.75);
+        var checkedBoxes = ImageProcessor.DetectCheckBoxes(imageFile, 0.75);
 
         // OCR Processing
         using (var img = Pix.LoadFromFile(imageFile))
@@ -166,10 +166,10 @@ public class PDFProcessor
         }
 
         // 3. Append the detected checkbox position to the result string
-        // foreach (var box in checkedBoxes)
-        // {
-        //     filteredText.Append($"BOX: {box} ");
-        // }
+        foreach (var box in checkedBoxes)
+        {
+            filteredText.Append($"BOX: {box} ");
+        }
 
         return filteredText.ToString().Trim();
     }

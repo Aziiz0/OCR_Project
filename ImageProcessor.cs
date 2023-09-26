@@ -77,14 +77,14 @@ public class ImageProcessor
                 var roi = new Mat(src.Mat, boundingRects[i]);
 
                 // Convert the Mat to Image<Bgr, byte> and clean the cropped image
-                // var roiImage = roi.ToImage<Bgr, byte>();
-                // var cleanedRoi = CleanText(roiImage, 3, 1, 70);
+                var roiImage = roi.ToImage<Bgr, byte>();
+                var cleanedRoi = CleanText(roiImage, 3, 1, 70);
 
                 // Save the cleaned cropped image
                 string contourImage = Path.Combine(croppedImagesDirectory, $"contour_{pageNumber}_{i}.png");
                 try 
                 {
-                    roi.Save(contourImage);
+                    cleanedRoi.Save(contourImage);
                 }
                 catch(Exception ex)
                 {
@@ -252,7 +252,6 @@ public class ImageProcessor
         return bestParameters;
     }
 
-
     public static double ComputeIoU(Rectangle boxA, Rectangle boxB)
     {
         int xA = Math.Max(boxA.X, boxB.X);
@@ -283,8 +282,8 @@ public class ImageProcessor
             using (var page = ocr.Process(Pix.LoadFromFile(imagePath)))
             {
                 // Save the extracted text to a file
-                string extractedText = page.GetText();
-                File.WriteAllText(Path.Combine(Path.GetDirectoryName(imagePath), "extractedText.txt"), extractedText);
+                // string extractedText = page.GetText();
+                // File.WriteAllText(Path.Combine(Path.GetDirectoryName(imagePath), "extractedText.txt"), extractedText);
 
                 var iterator = page.GetIterator();
                 iterator.Begin();
@@ -492,7 +491,7 @@ public class ImageProcessor
 
             // Use contour approximation to check if the contour is nearly a rectangle
             VectorOfPoint approxContour = new VectorOfPoint();
-            CvInvoke.ApproxPolyDP(contours[i], approxContour, CvInvoke.ArcLength(contours[i], true) * 0.05, true);  // Adjusted to 0.05
+            CvInvoke.ApproxPolyDP(contours[i], approxContour, CvInvoke.ArcLength(contours[i], true) * 0.06, true);  // Adjusted to 0.05
 
             // Specify a fixed area range for the checkboxes.
             int minArea = (fixedCheckBoxSize.Width - sizeTolerance) * (fixedCheckBoxSize.Height - sizeTolerance);
@@ -644,6 +643,7 @@ public class ImageProcessor
         { @"CroppedImages\contour_1_3987.png", "A 978.00" }
         // ... add all image paths and their corresponding reference texts
     };
+
     private static int EvaluateOCRQuality(TesseractEngine engine, string cleanedImagePath, string originalImagePath)
     {
         if (!referenceTexts.ContainsKey(originalImagePath))
@@ -656,8 +656,6 @@ public class ImageProcessor
         string ocrText = PDFProcessor.PageOCR(engine, cleanedImagePath);
         return ComputeWeightedErrorPercentage(ocrText, referenceText);
     }
-
-
 
     public static (int, int, double) OptimizeCleanTextParameters(string dataPath, string language, List<string> imageFiles)
     {
