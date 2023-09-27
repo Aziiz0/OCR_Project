@@ -39,7 +39,7 @@ public class PDFProcessor
         string outputBase = $"output_{Path.GetFileNameWithoutExtension(pdfFile)}";
 
         // Initialize Tesseract OCR engine
-        using (var engine = new TesseractEngine(tessdataDir, "eng", EngineMode.TesseractAndLstm))
+        using (var engine = new TesseractEngine(tessdataDir, "eng", EngineMode.LstmOnly))
         {
             string ocrResultsFile = $"ocr_results_{Path.GetFileNameWithoutExtension(pdfFile)}.txt";
 

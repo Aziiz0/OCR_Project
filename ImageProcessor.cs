@@ -272,13 +272,13 @@ public class ImageProcessor
         Left
     }
 
-    public static void FixBoxAboveText(string imagePath, string first, string second, TextAlignment textAlignment = TextAlignment.Center, int lineThickness = 2, int heightAboveText = 12, int lineWidth = 260)
+    public static void FixBoxAboveText(string imagePath, string first, string second, TextAlignment textAlignment = TextAlignment.Center, int lineThickness = 2, int heightAboveText = 8, int lineWidth = 260)
     {
         using (Image<Bgr, byte> img = new Image<Bgr, byte>(imagePath))
         using (Image<Gray, byte> grayImg = img.Convert<Gray, byte>())
         {
             // Use Tesseract to locate the position of the text
-            using (var ocr = new TesseractEngine(@"tessdata", "eng", EngineMode.Default))
+            using (var ocr = new TesseractEngine(@"tessdata_fast", "eng", EngineMode.Default))
             using (var page = ocr.Process(Pix.LoadFromFile(imagePath)))
             {
                 // Save the extracted text to a file

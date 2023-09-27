@@ -15,12 +15,13 @@ class Program
 
     static void Main(string[] args)
     {
+        Console.WriteLine("Starting program...");
         // {   // OPTIMIZE CLEAN TEXT PARAMETERS
 
         //     List<string> imageFile = new List<string> {@"CroppedImages\contour_1_466.png", @"CroppedImages\contour_1_724.png", @"CroppedImages\contour_1_1770.png",
         //                                                @"CroppedImages\contour_1_3983.png", @"CroppedImages\contour_1_3986.png", @"CroppedImages\contour_1_3987.png"};
             
-        //     var bestParams = ImageProcessor.OptimizeCleanTextParameters(@"./tessdata", "eng", imageFile);
+        //     var bestParams = ImageProcessor.OptimizeCleanTextParameters(@"./tessdata_best", "eng", imageFile);
         //     Console.WriteLine($"Best Parameters: Kernel Size = {bestParams.Item1}, Iterations = {bestParams.Item2}, Threshold Area = {bestParams.Item3}");
             
         //     int counter = 1;  // Starting counter
@@ -77,7 +78,7 @@ class Program
             var pdfFiles = Directory.GetFiles(pdfDirectoryPath, "*.pdf");
 
             // Create an instance of PDFProcessor
-            var processor = new PDFProcessor(@"./tessdata", @"C:\Users\adeeb\OneDrive\Documents\GitHub\PDFToImage\dist\pdf_to_images.exe");
+            var processor = new PDFProcessor(@"./tessdata_best", @"C:\Users\adeeb\OneDrive\Documents\GitHub\PDFToImage\dist\pdf_to_images.exe");
 
             // Specify the pages you want to process
             List<int> pagesToProcess = new List<int> { 1 };

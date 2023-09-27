@@ -62,3 +62,6 @@ Mkfile.old
 dkms.conf
 *.png
 *.txt
+tessdata_best/
+tessdata_fast/
+tessdata_best
