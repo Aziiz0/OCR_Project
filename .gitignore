@@ -2,6 +2,8 @@
 .vs/
 .vscode/
 tessdata/
+tessdata_best/
+tessdata_fast/
 OutputTexts/
 PDFs/
 OutputImages/
@@ -62,6 +64,3 @@ Mkfile.old
 dkms.conf
 *.png
 *.txt
-tessdata_best/
-tessdata_fast/
-tessdata_best
